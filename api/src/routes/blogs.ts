@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import userMiddleware from "../middleware/user";
 import { z } from "zod";
 import enhancedUpload from "../storage/index";
-import redisClient from "../redisClient";
+import redisClient from "../redis/redisClient";
 import emailService from "../services/emailService";
 
 

@@ -5,7 +5,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken"
 import { PrismaClient } from "@prisma/client";
 import userMiddleware from "../middleware/user";
-import redisClient from "../redisClient";
+import redisClient from "../redis/redisClient";
 import emailService from "../services/emailService"; // Assuming you have an email service set up
 
 dotenv.config();

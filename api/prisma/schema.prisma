@@ -21,6 +21,7 @@ model User {
   posts     Post[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([email], name: "idx_user_email")
 }
 
 model Post {
@@ -32,4 +33,5 @@ model Post {
   author    User     @relation(fields: [authorId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([id], name: "idx_post_id")
 }
