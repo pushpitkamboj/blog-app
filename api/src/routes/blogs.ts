@@ -6,6 +6,7 @@ import userMiddleware from "../middleware/user";
 import { z } from "zod";
 import enhancedUpload from "../storage/index";
 import redisClient from "../redisClient";
+import emailService from "../services/emailService";
 
 
 dotenv.config();
@@ -31,6 +32,12 @@ router.post("/", userMiddleware, enhancedUpload.single('image'), async (req: Req
     }
 
     try {
+        // Get user info for email
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true, username: true }
+        });
+
         const newPost = await prisma.post.create({
             data: {
                 title,
@@ -43,6 +50,18 @@ router.post("/", userMiddleware, enhancedUpload.single('image'), async (req: Req
         await redisClient.set(`post:${postId}`, JSON.stringify(newPost), 'EX', 300);
         await redisClient.del('allPosts'); // Invalidate cache for all posts
         await redisClient.del(`userPosts:${userId}`); // Invalidate cache for user's posts
+
+        // Send post created email asynchronously
+        if (user) {
+            await emailService.sendPostCreatedEmail(
+                user.email,
+                user.username,
+                title,
+                postId
+            );
+            console.log(`📧 Post creation email queued for ${user.email}`);
+        }
+
         res.status(201).json(newPost);
     } catch (error: any) {
         console.error("Error creating post:", error);
@@ -219,7 +238,12 @@ router.put("/:id", userMiddleware, enhancedUpload.single('image'), async (req: R
 
     try {
         const post = await prisma.post.findUnique({
-            where: { id: postId }
+            where: { id: postId },
+            include: {
+                author: {
+                    select: { email: true, username: true }
+                }
+            }
         });
 
         if (!post) {
@@ -245,6 +269,15 @@ router.put("/:id", userMiddleware, enhancedUpload.single('image'), async (req: R
         await redisClient.set(`post:${updatedPost.id}`, JSON.stringify(updatedPost), 'EX', 300);
         await redisClient.del('allPosts'); // Invalidate cache for all posts
         await redisClient.del(`userPosts:${userId}`); // Invalidate cache for user's posts
+
+        // Send post updated email asynchronously
+        await emailService.sendPostUpdatedEmail(
+            post.author.email,
+            post.author.username,
+            title,
+            postId
+        );
+        console.log(`📧 Post update email queued for ${post.author.email}`);
         
         res.status(200).json({ 
             message: "Post updated successfully",
@@ -301,5 +334,8 @@ router.delete("/:id", userMiddleware, async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error deleting post", error });
     }
 })
+
+// Add endpoint to check email queue status
+
 
 export default router;

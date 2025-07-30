@@ -5,8 +5,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken"
 import { PrismaClient } from "@prisma/client";
 import userMiddleware from "../middleware/user";
-import Redis from "../redisClient";
 import redisClient from "../redisClient";
+import emailService from "../services/emailService"; // Assuming you have an email service set up
 
 dotenv.config();
 
@@ -72,15 +72,22 @@ router.post('/signup', async (req: Request, res: Response) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await prisma.user.create({
+    const user = await prisma.user.create({
         data: {
             username: username,
             password: hashedPassword,
             email: email
         }
     })
+
     res.status(201).json({message: "user signed up successfully"})
-})
+    // Send welcome email
+    await emailService.sendWelcomeEmail(
+                    user.email,
+                    user.username,
+                    user.id
+                );
+});
 
 
 router.post('/login', async (req: Request, res: Response) => {

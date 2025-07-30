@@ -4,10 +4,11 @@ import cors from 'cors';
 import userRouter from './routes/user'; 
 import userPost from './routes/blogs';
 import swagger from './swagger/index';
+import adminRouter from './routes/admin';
 
 dotenv.config();
 
-const port = process.env.PORT || 3002;
+const port = process.env.PORT;
 
 const app: Application = express();
 app.use(cors());
@@ -18,6 +19,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use("/auth", userRouter);
 app.use("/posts", userPost);
 app.use("/docs", swagger);
+app.use("/admin", adminRouter);
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Hello, welcome to demo api of blog app!');
