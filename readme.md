@@ -247,6 +247,8 @@ The API comes with comprehensive Swagger documentation that allows you to explor
 - **React-Toastify** - Toast notifications
 - **Date-fns** - Date utility library
 
+![alt text](architecture-blog.png)
+
 ## License
 
 ISC
