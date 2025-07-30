@@ -97,24 +97,32 @@ const EditPost: React.FC = () => {
       
       const imageFile = fileInputRef.current?.files?.[0];
       
+      if (imageFile && !validateImageFile(imageFile)) {
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Prepare data for submission
       if (imageFile) {
-
-        if (!validateImageFile(imageFile)) {
-          setIsSubmitting(false);
-          return;
-        }
-        
+        // If there's a new image, use FormData
         const formData = new FormData();
         formData.append('title', data.title);
         formData.append('content', data.content);
         formData.append('image', imageFile);
         
+        await postsAPI.updatePost(id, formData);
+      } else {
+        // If there's no new image, use JSON
+        await postsAPI.updatePost(id, {
+          title: data.title,
+          content: data.content
+        });
       }
       
       toast.success('Post updated successfully!');
       navigate(`/posts/${id}`);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
+      console.error('Failed to update post:', error);
       toast.error('Failed to update post. Please try again.');
     } finally {
       setIsSubmitting(false);

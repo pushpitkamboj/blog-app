@@ -7,8 +7,8 @@ const SECRET_KEY = process.env.SECRET_KEY;
 
 function userMiddleware(req: Request, res:Response, next: NextFunction) {
 
-    let authHeader: Request['headers']['authorization'];
-    authHeader = req.headers.authorization;
+    // let authHeader: Request['headers']['authorization'];
+    let authHeader = req.headers.authorization;
 
     if (!authHeader) {
         res.json({
@@ -18,7 +18,8 @@ function userMiddleware(req: Request, res:Response, next: NextFunction) {
     }
 
     const tokenParts = authHeader.split(" ");
-    const jwtToken = tokenParts[1];    try { 
+    const jwtToken = tokenParts[1];    
+    try { 
         if (!SECRET_KEY) {
             throw new Error("SECRET_KEY is not defined in env");
         }
