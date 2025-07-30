@@ -5,6 +5,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken"
 import { PrismaClient } from "@prisma/client";
 import userMiddleware from "../middleware/user";
+import Redis from "../redisClient";
+import redisClient from "../redisClient";
 
 dotenv.config();
 
@@ -119,6 +121,13 @@ router.post('/login', async (req: Request, res: Response) => {
 
 router.get('/profile', userMiddleware, async (req: Request, res: Response) => {
     const userId = (req as any).user.userId;
+    const cachedUser = await redisClient.get(`user:${userId}`);
+
+    if (cachedUser) {
+        console.log("Fetching user from cache");
+        return res.json(JSON.parse(cachedUser));
+    }
+    console.log("Fetching user from database");
     const user = await prisma.user.findUnique({
         where: { id: userId }
     });

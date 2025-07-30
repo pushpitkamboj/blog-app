@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import userMiddleware from "../middleware/user";
 import { z } from "zod";
 import enhancedUpload from "../storage/index";
+import redisClient from "../redisClient";
 
 
 dotenv.config();
@@ -38,7 +39,10 @@ router.post("/", userMiddleware, enhancedUpload.single('image'), async (req: Req
                 imageUrl: imageUrl
             },
         });
-        
+        const postId = newPost.id;
+        await redisClient.set(`post:${postId}`, JSON.stringify(newPost), 'EX', 300);
+        await redisClient.del('allPosts'); // Invalidate cache for all posts
+        await redisClient.del(`userPosts:${userId}`); // Invalidate cache for user's posts
         res.status(201).json(newPost);
     } catch (error: any) {
         console.error("Error creating post:", error);
@@ -51,7 +55,17 @@ router.post("/", userMiddleware, enhancedUpload.single('image'), async (req: Req
 })
 
 router.get("/", async (req: Request, res: Response) => {
+    const cachedKey = 'allPosts';
+
     try {
+        const cachedPosts = await redisClient.get(cachedKey);
+
+        if (cachedPosts) {
+            console.log("Fetching posts from cache");
+            res.status(200).json(JSON.parse(cachedPosts));
+            return;
+        }
+
         const posts = await prisma.post.findMany({
             select: {
                 id : true,
@@ -71,6 +85,8 @@ router.get("/", async (req: Request, res: Response) => {
                 createdAt: 'desc'
             }
         });
+        console.log("Fetching posts from database");
+        await redisClient.set(cachedKey, JSON.stringify(posts), 'EX', 300); // Cache for 5 minutes
         res.status(200).json(posts);
     } catch (error) {
         res.status(500).json({ message: "Error fetching posts", error });
@@ -80,7 +96,14 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.get("/my-posts", userMiddleware, async (req: Request, res: Response) => {
     const userId = (req as any).user.userId;
+    const myPostsCacheKey = `userPosts:${userId}`;
+
     try {
+        const cachedPosts = await redisClient.get(myPostsCacheKey);
+        if (cachedPosts) {
+            return res.status(200).json(JSON.parse(cachedPosts));
+        }
+
         const posts = await prisma.post.findMany({
             where: {
                 authorId: userId
@@ -98,8 +121,9 @@ router.get("/my-posts", userMiddleware, async (req: Request, res: Response) => {
                 createdAt: 'desc'
             }
         });
+        await redisClient.set(myPostsCacheKey, JSON.stringify(posts), 'EX', 300);
         res.status(200).json(posts);
-    } catch (error) {
+    } catch (error: any) {
         res.status(500).json({ message: "Error fetching posts", error });
     }
 })
@@ -107,6 +131,9 @@ router.get("/my-posts", userMiddleware, async (req: Request, res: Response) => {
 
 router.get("/:id", async (req: Request, res: Response) => {
     const postId = req.params.id;
+    const cachedPostKey = `post:${postId}`;
+    
+
 
     if (!postId) {
         res.status(400).json({ message: "Post ID is required" });
@@ -117,7 +144,13 @@ router.get("/:id", async (req: Request, res: Response) => {
         return;
     }
 
+    const cachedPost = await redisClient.get(cachedPostKey);
     try {
+        if (cachedPost) {
+            console.log("Fetching post from post cache");
+            res.status(200).json(JSON.parse(cachedPost));
+            return;
+        }
         const post = await prisma.post.findUnique({
             where: {
                 id: postId
@@ -142,7 +175,7 @@ router.get("/:id", async (req: Request, res: Response) => {
             res.status(404).json({ message: "Post not found" });
             return;
         }
-
+        await redisClient.set(cachedPostKey, JSON.stringify(post), 'EX', 300);
         res.status(200).json(post);
     } catch (error) {
         res.status(500).json({ message: "Error fetching post", error });
@@ -209,6 +242,9 @@ router.put("/:id", userMiddleware, enhancedUpload.single('image'), async (req: R
             where: { id: postId },
             data: updateData
         });
+        await redisClient.set(`post:${updatedPost.id}`, JSON.stringify(updatedPost), 'EX', 300);
+        await redisClient.del('allPosts'); // Invalidate cache for all posts
+        await redisClient.del(`userPosts:${userId}`); // Invalidate cache for user's posts
         
         res.status(200).json({ 
             message: "Post updated successfully",
@@ -256,7 +292,10 @@ router.delete("/:id", userMiddleware, async (req: Request, res: Response) => {
         await prisma.post.delete({
             where: { id: postId }
         });
-        
+        await redisClient.del(`post:${postId}`); // Invalidate cache for the deleted post
+        await redisClient.del('allPosts'); // Invalidate cache for all posts
+        await redisClient.del(`userPosts:${userId}`); // Invalidate cache for user's posts
+        await redisClient.del(`user:${userId}`); // Invalidate cache for user's profile
         res.status(200).json({ message: "Post deleted successfully" });
     } catch (error) {
         res.status(500).json({ message: "Error deleting post", error });

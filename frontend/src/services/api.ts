@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Post, PostInput, User, UserLogin, UserSignup } from '../types';
 
-const API_URL = 'http://localhost:3002';
+const API_URL = 'http://localhost:3000';
 
 const api = axios.create({
   baseURL: API_URL,
